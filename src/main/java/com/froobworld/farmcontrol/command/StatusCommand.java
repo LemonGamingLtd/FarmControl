@@ -1,16 +1,16 @@
 package com.froobworld.farmcontrol.command;
 
 import com.froobworld.farmcontrol.FarmControl;
+import com.froobworld.farmcontrol.controller.FarmController;
+import com.froobworld.farmcontrol.controller.entity.SnapshotEntity;
 import com.froobworld.farmcontrol.data.FcData;
-import com.froobworld.farmcontrol.hook.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -47,27 +47,20 @@ public class StatusCommand implements CommandExecutor {
         AtomicInteger affectedCount = new AtomicInteger(0);
         Map<String, AtomicInteger> actionCount = new HashMap<>();
 
-        CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
-        for (LivingEntity entity : world.getLivingEntities()) {
-            entityCount.incrementAndGet();
-            CompletableFuture<Void> entityFuture = new CompletableFuture();
-            ScheduledTask scheduledTask = farmControl.getHookManager().getSchedulerHook().runEntityTaskAsap(() -> {
-                try {
-                    FcData fcData = FcData.get(entity);
-                    if (fcData != null) {
-                        affectedCount.incrementAndGet();
-                        for (String action : fcData.getActions()) {
-                            actionCount.computeIfAbsent(action, a -> new AtomicInteger(0)).incrementAndGet();
-                        }
+        final CompletableFuture<Void> completableFuture = new CompletableFuture<>();
+        farmControl.getHookManager().getEntityGetterHook().getSnapshotEntities(world, FarmController.ENTITY_CLASSES).thenAccept(entities -> {
+            entityCount.set(entities.size());
+            for (SnapshotEntity entity : entities) {
+                FcData fcData = entity.getFcData();
+                if (fcData != null && !fcData.getActions().isEmpty()) {
+                    affectedCount.incrementAndGet();
+                    for (String action : fcData.getActions()) {
+                        actionCount.computeIfAbsent(action, a -> new AtomicInteger(0)).incrementAndGet();
                     }
-                } finally {
-                    entityFuture.complete(null);
                 }
-            }, () -> entityFuture.complete(null), entity);
-            if (scheduledTask != null) {
-                completableFuture = completableFuture.thenCompose(v -> entityFuture);
             }
-        }
+            completableFuture.complete(null);
+        });
         completableFuture.thenRunAsync(() -> {
             sender.sendMessage(ChatColor.GRAY + "Status for world '" + ChatColor.RED + world.getName() + ChatColor.GRAY + "'");
             sender.sendMessage("");

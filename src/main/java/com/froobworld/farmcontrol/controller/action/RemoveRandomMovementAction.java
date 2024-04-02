@@ -1,8 +1,10 @@
 package com.froobworld.farmcontrol.controller.action;
 
+import com.froobworld.farmcontrol.FarmControl;
 import com.froobworld.farmcontrol.utils.NmsUtils;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Sets;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 
 import java.util.*;
@@ -24,16 +26,27 @@ public class RemoveRandomMovementAction extends Action {
         }
     }
 
-    public static void cleanUp() {
-        entityRemovedGoalsMap.entrySet().removeIf(entry -> !entry.getKey().isValid());
+    public static void cleanUp(FarmControl farmControl) {
+        List<Mob> mobs = new ArrayList<>(entityRemovedGoalsMap.keySet());
+        for (Mob mob : mobs) {
+            farmControl.getHookManager().getSchedulerHook().runEntityTaskAsap(() -> {
+                if (!mob.isValid()) {
+                    entityRemovedGoalsMap.remove(mob);
+                }
+            }, () -> entityRemovedGoalsMap.remove(mob), mob);
+        }
     }
 
     public RemoveRandomMovementAction() {
-        super("remove-random-movement", false, false, true);
+        super("remove-random-movement", Mob.class, false, false, true);
     }
 
     @Override
-    public void doAction(Mob mob) {
+    public void doAction(Entity entity) {
+        if (!(entity instanceof Mob mob)) {
+            return;
+        }
+
         Object entityObject = on(mob).call("getHandle").get();
         Set<?> wrappedGoals = on(entityObject)
                 .field(NmsUtils.GoalSelectorHelper.getGoalSelectorFieldName())
@@ -55,7 +68,10 @@ public class RemoveRandomMovementAction extends Action {
     }
 
     @Override
-    public void undoAction(Mob mob) {
+    public void undoAction(Entity entity) {
+        if (!(entity instanceof Mob mob)) {
+            return;
+        }
         Object entityObject = on(mob).call("getHandle").get();
         Set<Object> wrappedGoals = on(entityObject)
                 .field(NmsUtils.GoalSelectorHelper.getGoalSelectorFieldName())

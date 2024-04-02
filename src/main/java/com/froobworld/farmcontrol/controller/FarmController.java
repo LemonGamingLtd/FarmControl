@@ -1,7 +1,9 @@
 package com.froobworld.farmcontrol.controller;
 
 import com.froobworld.farmcontrol.FarmControl;
-import com.froobworld.farmcontrol.controller.task.*;
+import com.froobworld.farmcontrol.controller.task.ActionPerformTask;
+import com.froobworld.farmcontrol.controller.task.TriggerCheckTask;
+import com.froobworld.farmcontrol.controller.task.UntriggerPerformTask;
 import com.froobworld.farmcontrol.controller.tracker.CycleHistoryManager;
 import com.froobworld.farmcontrol.controller.trigger.Trigger;
 import com.froobworld.farmcontrol.hook.scheduler.RegionisedSchedulerHook;
@@ -9,11 +11,13 @@ import com.froobworld.farmcontrol.hook.scheduler.ScheduledTask;
 import com.froobworld.farmcontrol.utils.Actioner;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
+import org.bukkit.entity.*;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 public class FarmController {
+    public static final Class<?>[] ENTITY_CLASSES = List.of(Mob.class, Vehicle.class, Projectile.class, Item.class).toArray(new Class[0]);
     private final FarmControl farmControl;
     private final CycleHistoryManager cycleHistoryManager;
     private final Map<World, Map<Trigger, Set<ActionProfile>>> worldTriggerProfilesMap = new HashMap<>();
@@ -81,11 +85,13 @@ public class FarmController {
 
     public void removeWorld(World world) {
         worldTriggerProfilesMap.remove(world);
-        for (Entity entity : world.getLivingEntities()) {
-            farmControl.getHookManager().getSchedulerHook().runEntityTaskAsap(
-                    () -> Actioner.undoAllActions(entity, farmControl),
-                    null, entity);
-        }
+        farmControl.getHookManager().getEntityGetterHook().getEntities(world).thenAccept(entities -> {
+            for (Entity entity : entities) {
+                farmControl.getHookManager().getSchedulerHook().runEntityTaskAsap(
+                        () -> Actioner.undoAllActions(entity, farmControl),
+                        null, entity);
+            }
+        });
     }
 
     public void register() {
