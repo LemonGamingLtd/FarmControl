@@ -8,8 +8,10 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SnapshotEntity {
+    private static final AtomicBoolean useWoodType = new AtomicBoolean(false);
     private final Entity entity;
     private final int entityId;
     private final Vector location;
@@ -20,6 +22,8 @@ public class SnapshotEntity {
     private final boolean tamed;
     private final boolean isPatrolLeader;
     private final int ticksLived;
+    private final boolean pickupable;
+    private final boolean mounted;
     private final List<Object> classifications = new ArrayList<>();
 
     public SnapshotEntity(Entity entity) {
@@ -32,7 +36,9 @@ public class SnapshotEntity {
         this.customName = entity.getCustomName() != null;
         this.tamed = entity instanceof Tameable && ((Tameable) entity).isTamed();
         this.isPatrolLeader = entity instanceof Raider && ((Raider) entity).isPatrolLeader();
+        this.pickupable = entity instanceof AbstractArrow && ((AbstractArrow) entity).getPickupStatus() == AbstractArrow.PickupStatus.ALLOWED;
         this.ticksLived = entity.getTicksLived();
+        this.mounted = !entity.getPassengers().isEmpty();
         classifications.add(entity.getType());
         if (entity instanceof Colorable) {
             DyeColor colour = ((Colorable) entity).getColor();
@@ -42,6 +48,23 @@ public class SnapshotEntity {
         }
         if (entity instanceof Villager) {
             classifications.add(((Villager) entity).getProfession());
+        }
+        if (entity instanceof Item) {
+            classifications.add(((Item) entity).getItemStack().getType());
+        }
+        if (entity instanceof Boat) {
+            // try to add boat type, falling back to wood type for version < 1.19
+            if (!SnapshotEntity.useWoodType.get()) {
+                try {
+                    classifications.add(((Boat) entity).getBoatType());
+                } catch (Throwable throwable) {
+                    useWoodType.set(true);
+                }
+            }
+            if (SnapshotEntity.useWoodType.get()) {
+                //noinspection deprecation
+                classifications.add(((Boat) entity).getWoodType());
+            }
         }
     }
 
@@ -91,6 +114,14 @@ public class SnapshotEntity {
 
     public boolean isPatrolLeader() {
         return isPatrolLeader;
+    }
+
+    public boolean isPickupable() {
+        return pickupable;
+    }
+
+    public boolean isMounted() {
+        return mounted;
     }
 
     public int getTicksLived() {

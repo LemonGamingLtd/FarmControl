@@ -25,6 +25,8 @@ public class ExclusionManager {
         boolean excludePatrolLeaders = exclusionSettings.patrolLeader.get();
         List<String> excludeType = exclusionSettings.type.get();
         long excludeTicksLived = exclusionSettings.youngerThan.get();
+        boolean excludePickupable = exclusionSettings.pickupable.get();
+        boolean excludeMounted = exclusionSettings.mounted.get();
         return snapshotEntity -> {
             if (excludeLeashed && snapshotEntity.isLeashed()) {
                 return true;
@@ -39,6 +41,12 @@ public class ExclusionManager {
                 return true;
             }
             if (excludePatrolLeaders && snapshotEntity.isPatrolLeader()) {
+                return true;
+            }
+            if (excludePickupable && snapshotEntity.isPickupable()) {
+                return true;
+            }
+            if (excludeMounted && snapshotEntity.isMounted()) {
                 return true;
             }
             if (snapshotEntity.getTicksLived() < excludeTicksLived) {
